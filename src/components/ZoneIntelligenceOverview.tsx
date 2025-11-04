@@ -12,29 +12,47 @@ const ZoneIntelligenceOverview: React.FC = () => {
   const [userCurrentZone, setUserCurrentZone] = useState<Zone | undefined>();
 
   useEffect(() => {
-    // Initial load
-    setZones(zoneService.getZones());
-    setRecentEvents(zoneService.getZoneEvents(undefined, 10));
-    setUserCurrentZone(zoneService.getUserCurrentZone(userId));
+    let isMounted = true;
 
-    // Subscribe to real-time updates
-    const unsubscribe = zoneService.subscribe((updatedZones) => {
-      setZones(updatedZones);
-      setRecentEvents(zoneService.getZoneEvents(undefined, 10));
-      setUserCurrentZone(zoneService.getUserCurrentZone(userId));
+    const loadInitialData = async () => {
+      const zones = await zoneService.getZones();
+      const events = await zoneService.getZoneEvents(undefined, 10);
+      const userZone = await zoneService.getUserCurrentZone(userId);
+
+      if (isMounted) {
+        setZones(zones);
+        setRecentEvents(events);
+        setUserCurrentZone(userZone);
+      }
+    };
+
+    loadInitialData();
+
+    const unsubscribe = zoneService.subscribe(async (updatedZones) => {
+      if (isMounted) {
+        setZones(updatedZones);
+        const events = await zoneService.getZoneEvents(undefined, 10);
+        const userZone = await zoneService.getUserCurrentZone(userId);
+        setRecentEvents(events);
+        setUserCurrentZone(userZone);
+      }
     });
 
-    return unsubscribe;
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [userId]);
 
-  const handleQRScan = (qrData: string) => {
-    const result = zoneService.processQRScan(qrData, userId);
+  const handleQRScan = async (qrData: string) => {
+    const result = await zoneService.processQRScan(qrData, userId);
     setScanResult(result.message);
-    
+
     if (result.success) {
-      // Update UI immediately
-      setZones(zoneService.getZones());
-      setUserCurrentZone(zoneService.getUserCurrentZone(userId));
+      const zones = await zoneService.getZones();
+      const userZone = await zoneService.getUserCurrentZone(userId);
+      setZones(zones);
+      setUserCurrentZone(userZone);
     }
   };
 
